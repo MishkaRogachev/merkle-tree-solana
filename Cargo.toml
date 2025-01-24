@@ -1,0 +1,20 @@
+[package]
+name = "solana-native-merkle-tree"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[example]]
+name = "test-client"
+path = "test-client/client.rs"
+
+[dependencies]
+solana-program = "1.18.26"
+
+[dev-dependencies]
+solana-client = "1.18.26"
+solana-program-test = "1.18.26"
+solana-sdk = "1.18.26"
+tokio = "1.43.0"
