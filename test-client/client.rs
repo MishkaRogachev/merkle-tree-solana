@@ -108,4 +108,16 @@ async fn main() {
         Ok(signature) => println!("Transaction successful! Signature: {}", signature),
         Err(err) => eprintln!("Transaction failed: {}", err),
     }
+
+    // Retrieve the account
+    let account = client
+        .get_account(&tree_account.pubkey())
+        .expect("Failed to fetch Merkle tree account");
+
+    // Confirm the account has data
+    if account.data.is_empty() {
+        eprintln!("Merkle tree account has no data!");
+        return;
+    }
+    println!("Everything is fine");
 }
