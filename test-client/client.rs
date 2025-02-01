@@ -8,6 +8,7 @@ use solana_sdk::{
     system_instruction,
     transaction::Transaction,
 };
+use solana_transaction_status::UiTransactionEncoding;
 use std::str::FromStr;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
@@ -35,12 +36,10 @@ async fn main() {
 
     // Wait for airdrop confirmation
     println!("Waiting for airdrop confirmation...");
-    loop {
-        if client.confirm_transaction(&signature).unwrap() {
-            println!("Airdrop confirmed!");
-            break;
-        }
+    while !client.confirm_transaction(&signature).unwrap() {
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
+    println!("Airdrop confirmed!");
 
     // Create a new keypair for the Merkle tree account
     let tree_account = Keypair::new();
@@ -77,7 +76,7 @@ async fn main() {
     // Construct the struct
     let input = MerkleTreeInput { leaves };
 
-    // Call `try_to_vec` directly on the struct
+    // Serialize the Merkle tree input
     let mut instruction_data: Vec<u8> = Vec::new();
     input
         .serialize(&mut instruction_data)
@@ -105,19 +104,38 @@ async fn main() {
 
     // Send and confirm the transaction
     match client.send_and_confirm_transaction(&transaction) {
-        Ok(signature) => println!("Transaction successful! Signature: {}", signature),
-        Err(err) => eprintln!("Transaction failed: {}", err),
+        Ok(signature) => println!("Tree initialized! Signature: {}", signature),
+        Err(err) => eprintln!("Tree initialization failed: {}", err),
     }
 
-    // Retrieve the account
-    let account = client
-        .get_account(&tree_account.pubkey())
-        .expect("Failed to fetch Merkle tree account");
+    // Generate a proof for the first leaf (index 0)
+    let leaf_index: u32 = 0;
+    let mut proof_instruction_data: Vec<u8> = Vec::new();
+    leaf_index
+        .serialize(&mut proof_instruction_data)
+        .expect("Failed to serialize proof request");
 
-    // Confirm the account has data
-    if account.data.is_empty() {
-        eprintln!("Merkle tree account has no data!");
-        return;
-    }
-    println!("Everything is fine");
+    let build_proof_instruction = Instruction::new_with_borsh(
+        program_id,
+        &proof_instruction_data, // Leaf index as input
+        vec![AccountMeta::new(tree_account.pubkey(), false)],
+    );
+
+    let mut proof_transaction =
+        Transaction::new_with_payer(&[build_proof_instruction], Some(&payer.pubkey()));
+
+    proof_transaction.sign(&[&payer], client.get_latest_blockhash().unwrap());
+
+    let proof_signature = match client.send_and_confirm_transaction(&proof_transaction) {
+        Ok(sig) => {
+            println!("Proof generated! Signature: {}", sig);
+            sig
+        }
+        Err(err) => {
+            eprintln!("Proof generation failed: {}", err);
+            return;
+        }
+    };
+
+    // TODO: Fetch the proof from the logs
 }

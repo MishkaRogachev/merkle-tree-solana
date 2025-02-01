@@ -36,3 +36,62 @@ pub fn build_merkle_root(leaves: &[Hash]) -> Result<Hash, ProgramError> {
 
     Ok(current_level[0])
 }
+
+/// Generates a Merkle proof for a specific leaf index.
+pub fn build_proof(leaf_index: usize, leaves: &[Hash]) -> Result<Vec<Hash>, ProgramError> {
+    if leaves.is_empty() || leaf_index >= leaves.len() {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let mut proof = Vec::new();
+    let mut level = leaves.to_vec();
+    let mut index = leaf_index;
+
+    while level.len() > 1 {
+        let mut next_level = Vec::new();
+
+        for chunk in level.chunks(2) {
+            let left = chunk[0];
+            let right = if chunk.len() > 1 { chunk[1] } else { chunk[0] };
+
+            if index % 2 == 0 {
+                if chunk.len() > 1 {
+                    proof.push(right);
+                }
+            } else {
+                proof.push(left);
+            }
+
+            next_level.push(hash_two_hashes(left, right));
+        }
+
+        level = next_level;
+        index /= 2;
+    }
+
+    Ok(proof)
+}
+
+/// Recomputes the Merkle root from a `leaf_data` and `proof` (list of sibling hashes).
+pub fn recompute_merkle_root_from_proof(
+    leaf_data: &[u8],
+    proof: &[Hash],
+) -> Result<Hash, ProgramError> {
+    if proof.is_empty() {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    // Start with the hashed leaf
+    let mut current = hash_leaf(leaf_data);
+
+    // Traverse the proof and compute the Merkle root
+    for sibling in proof {
+        if current <= *sibling {
+            current = hash_two_hashes(current, *sibling);
+        } else {
+            current = hash_two_hashes(*sibling, current);
+        }
+    }
+
+    Ok(current)
+}

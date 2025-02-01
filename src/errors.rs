@@ -15,6 +15,14 @@ pub enum MerkleTreeError {
     /// Empty tree provided during initialization
     #[error("Cannot initialize a tree with no leaves")]
     EmptyTree,
+
+    /// Invalid leaf index
+    #[error("Invalid leaf index provided")]
+    InvalidLeafIndex,
+
+    /// Invalid proof
+    #[error("Invalid proof provided")]
+    InvalidProof,
 }
 
 impl From<MerkleTreeError> for ProgramError {
